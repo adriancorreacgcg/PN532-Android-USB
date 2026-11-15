@@ -173,18 +173,20 @@ public class MainActivity extends Activity implements Pn532.Log {
         return datos.length == 0 ? null : datos;
     }
 
-    /** READ RECORD por partes para no rebasar el buffer del PN532. */
-    private byte[] leerRegistro(byte[] apdu, int tg) {
-        if (apdu.length < 5) return null;
+    private byte[] leerRegistroCon(byte[] apdu, int tg, int le, String etiqueta) {
         byte[] mod = apdu.clone();
-        mod[4] = 0x40;
+        mod[4] = (byte) le;
         ByteArrayOutputStream acum = new ByteArrayOutputStream();
         byte[] r = enviar(mod, tg);
-        if (r == null) return null;
+        if (r == null) {
+            log("  trozo " + etiqueta + " sin respuesta (estado " + ultimoEstado + ")");
+            return null;
+        }
         for (int vuelta = 0; vuelta < 8; vuelta++) {
             if (r.length < 2) return null;
             int sw1 = r[r.length - 2] & 0xff;
             int sw2 = r[r.length - 1] & 0xff;
+            log("  trozo " + etiqueta + " len=" + r.length + " sw=" + Integer.toHexString((sw1 << 8) | sw2));
             if (sw1 == 0x90 && sw2 == 0x00) {
                 acum.write(r, 0, r.length - 2);
                 byte[] cuerpo = acum.toByteArray();
@@ -197,19 +199,26 @@ public class MainActivity extends Activity implements Pn532.Log {
                 acum.write(r, 0, r.length - 2);
                 byte[] gr = new byte[] { 0x00, (byte) 0xC0, 0x00, 0x00, (byte) sw2 };
                 r = enviar(gr, tg);
-                if (r == null) return null;
+                if (r == null) { log("  get response sin respuesta"); return null; }
                 continue;
             }
             if (sw1 == 0x6C) {
-                byte[] otro = apdu.clone();
-                otro[4] = (byte) sw2;
-                r = enviar(otro, tg);
+                mod[4] = (byte) sw2;
+                r = enviar(mod, tg);
                 if (r == null) return null;
                 continue;
             }
             return r;
         }
         return null;
+    }
+
+    private byte[] leerRegistro(byte[] apdu, int tg) {
+        if (apdu.length < 5) return null;
+        byte[] r = leerRegistroCon(apdu, tg, 0x40, "64");
+        if (r == null) r = leerRegistroCon(apdu, tg, 0x20, "32");
+        if (r == null) r = leerRegistroCon(apdu, tg, 0x10, "16");
+        return r;
     }
 
     private byte[] intercambiar(byte[] apdu, int tg) {
@@ -325,7 +334,7 @@ public class MainActivity extends Activity implements Pn532.Log {
     private void log(String mensaje) {
         runOnUiThread(() -> {
             logBuffer.append(mensaje).append('\n');
-            if (logBuffer.length() > 12000) logBuffer.delete(0, logBuffer.length() - 8000);
+            if (logBuffer.length() > 16000) logBuffer.delete(0, logBuffer.length() - 10000);
             logText.setText(logBuffer.toString());
         });
     }
