@@ -158,7 +158,9 @@ public class MainActivity extends Activity implements Pn532.Log {
 
     private boolean activarTarjeta() {
         byte[] p = pn532.transceive(Pn532Protocol.commandRaw(0x4A, new byte[] { 1, 0 }), 3000);
-        return p != null && p.length > 2 && (p[1] & 0xff) == 0x4b && (p[2] & 0xff) >= 1;
+        if (p == null) { log("  poll sin respuesta"); return false; }
+        log("  poll: " + Pn532Protocol.hex(p));
+        return p.length > 2 && (p[1] & 0xff) == 0x4b && (p[2] & 0xff) >= 1;
     }
 
     private byte[] enviar(byte[] apdu, int tg) {
@@ -256,7 +258,6 @@ public class MainActivity extends Activity implements Pn532.Log {
                         runOnUiThread(() -> cardInfo.setText("Tarjeta activada"));
                     } else {
                         fallos++;
-                        if (fallos == 1 || fallos % 5 == 0) log("Sin tarjeta, intento " + fallos);
                         if (fallos % 15 == 0) {
                             log("Reinicializando chip");
                             limpiarChip();
