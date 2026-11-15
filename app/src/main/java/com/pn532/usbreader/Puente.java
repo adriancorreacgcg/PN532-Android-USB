@@ -9,6 +9,7 @@ public final class Puente {
 
     private final LinkedBlockingQueue<byte[]> cola = new LinkedBlockingQueue<>();
     private final Object lock = new Object();
+    private final StringBuilder bitacora = new StringBuilder();
     private byte[] respuesta;
     private volatile boolean activo;
     private volatile boolean estatico;
@@ -18,9 +19,26 @@ public final class Puente {
     public boolean activo() { return activo; }
     public boolean estatico() { return estatico; }
 
+    public void anotar(String linea) {
+        synchronized (bitacora) {
+            bitacora.append(linea).append('\n');
+            if (bitacora.length() > 12000) bitacora.delete(0, bitacora.length() - 6000);
+        }
+    }
+
+    public String sacarBitacora() {
+        synchronized (bitacora) {
+            if (bitacora.length() == 0) return "";
+            String s = bitacora.toString();
+            bitacora.setLength(0);
+            return s;
+        }
+    }
+
     public void activar() {
         cola.clear();
         synchronized (lock) { respuesta = null; }
+        synchronized (bitacora) { bitacora.setLength(0); }
         estatico = false;
         activo = true;
     }
@@ -28,6 +46,7 @@ public final class Puente {
     public void activarEstatico() {
         cola.clear();
         synchronized (lock) { respuesta = null; }
+        synchronized (bitacora) { bitacora.setLength(0); }
         estatico = true;
         activo = true;
     }
