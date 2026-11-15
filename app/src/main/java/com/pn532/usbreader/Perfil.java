@@ -20,7 +20,7 @@ public final class Perfil {
         (byte) 0x90, 0x00
     };
 
-    /** Variante 1: FCI con directorio (87) y formato, igual que la donante. */
+    /** FCI con directorio y formato, igual que la donante. */
     private static final byte[] FCI_EMV = new byte[] {
         0x6F, 0x29, (byte) 0x84, 0x07,
         (byte) 0xA0, 0x00, 0x00, 0x00, 0x04, 0x10, 0x10,
@@ -32,7 +32,7 @@ public final class Perfil {
         (byte) 0x90, 0x00
     };
 
-    /** Variante 2: FCI sin directorio, modo banda puro. */
+    /** FCI sin directorio, modo banda puro. */
     private static final byte[] FCI_MSD = new byte[] {
         0x6F, 0x26, (byte) 0x84, 0x07,
         (byte) 0xA0, 0x00, 0x00, 0x00, 0x04, 0x10, 0x10,
@@ -43,14 +43,14 @@ public final class Perfil {
         (byte) 0x90, 0x00
     };
 
-    /** Variante 1: AIP + AFL que apunta al registro de la pista 2. */
+    /** AIP + AFL que apunta al registro de la pista 2. */
     private static final byte[] GPO_EMV = new byte[] {
         0x77, 0x0A, (byte) 0x82, 0x02, 0x19, (byte) 0x80,
         (byte) 0x94, 0x04, 0x34, 0x01, 0x01, 0x00,
         (byte) 0x90, 0x00
     };
 
-    /** Variante 2: formato 1 con la pista 2 cruda. */
+    /** Formato 1 con la pista 2 cruda, sin AFL ni criptograma. */
     private static final byte[] GPO_MSD = new byte[] {
         (byte) 0x80, 0x10, 0x19, (byte) 0x80,
         0x55, 0x79, 0x07, 0x01, 0x61, 0x48, 0x35, 0x35, (byte) 0xD3,
@@ -92,6 +92,10 @@ public final class Perfil {
     private static volatile int variante = 1;
 
     public static void variante(int v) { variante = v; }
+
+    public static int varianteActual() { return variante; }
+
+    public static byte[] gpoBanda() { return GPO_MSD; }
 
     public static byte[] responder(byte[] apdu) {
         if (apdu.length < 4) return NO_SOPORTADO;
