@@ -40,6 +40,28 @@ public final class Pn532Protocol {
         return result;
     }
 
+    /** Igual que command(), pero los parámetros ya vienen como arreglo de bytes. */
+    public static byte[] commandRaw(int command, byte[] parameters) {
+        int len = 2 + parameters.length;
+        if (len > 255) throw new IllegalArgumentException("PN532 frame too large");
+        byte[] result = new byte[7 + len];
+        result[0] = 0;
+        result[1] = 0;
+        result[2] = (byte) 0xff;
+        result[3] = (byte) len;
+        result[4] = (byte) (-len);
+        result[5] = (byte) 0xd4;
+        result[6] = (byte) command;
+        int sum = 0xd4 + (command & 0xff);
+        for (int i = 0; i < parameters.length; i++) {
+            result[7 + i] = parameters[i];
+            sum += parameters[i] & 0xff;
+        }
+        result[5 + len] = (byte) (-sum);
+        result[6 + len] = 0;
+        return result;
+    }
+
     public static byte[] concat(byte[] a, byte[] b) {
         byte[] out = Arrays.copyOf(a, a.length + b.length);
         System.arraycopy(b, 0, out, a.length, b.length);
