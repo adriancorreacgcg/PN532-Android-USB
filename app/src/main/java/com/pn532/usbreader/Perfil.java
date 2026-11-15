@@ -32,7 +32,7 @@ public final class Perfil {
         (byte) 0x90, 0x00
     };
 
-    /** FCI sin directorio, modo banda puro. */
+    /** FCI sin directorio: modo banda. */
     private static final byte[] FCI_MSD = new byte[] {
         0x6F, 0x26, (byte) 0x84, 0x07,
         (byte) 0xA0, 0x00, 0x00, 0x00, 0x04, 0x10, 0x10,
@@ -58,9 +58,9 @@ public final class Perfil {
         (byte) 0x90, 0x00
     };
 
-    /** Formato 1 con AIP 00 00: apaga CDA y fuerza banda. */
+    /** Formato 1 con CVM prendido y CDA apagado: fuerza banda. */
     private static final byte[] GPO_DOWNGRADE = new byte[] {
-        (byte) 0x80, 0x10, 0x00, 0x00,
+        (byte) 0x80, 0x10, 0x18, 0x00,
         0x55, 0x79, 0x07, 0x01, 0x61, 0x48, 0x35, 0x35, (byte) 0xD3,
         0x00, 0x32, 0x01, (byte) 0x94, 0x2F,
         (byte) 0x90, 0x00
@@ -105,7 +105,11 @@ public final class Perfil {
 
     public static byte[] gpoBanda() { return GPO_DOWNGRADE; }
 
+    public static byte[] fciBanda() { return FCI_MSD; }
+
     public static byte[] registro() { return REGISTRO; }
+
+    public static boolean esAid(byte[] apdu) { return contiene(apdu, AID_TARJETA); }
 
     public static byte[] responder(byte[] apdu) {
         if (apdu.length < 4) return NO_SOPORTADO;
