@@ -148,17 +148,26 @@ public class MainActivity extends Activity implements Pn532.Log {
 
     private void bucleRelay() {
         int tg = 0;
+        int fallos = 0;
         while (relay) {
             try {
                 if (tg == 0) {
                     byte[] r = pn532.transceive(
                             Pn532Protocol.commandRaw(0x4A, new byte[] { 1, 0 }), 400);
-                    if (r != null && r.length > 2 && (r[1] & 0xff) == 0x4b && (r[2] & 0xff) == 1) {
+                    boolean hay = r != null && r.length > 2
+                            && (r[1] & 0xff) == 0x4b && (r[2] & 0xff) == 1;
+                    if (hay) {
                         tg = 1;
+                        fallos = 0;
                         log("Tarjeta activada");
                         runOnUiThread(() -> cardInfo.setText("Tarjeta activada"));
                     } else {
-                        Thread.sleep(120);
+                        fallos++;
+                        if (fallos == 1 || fallos % 10 == 0) {
+                            log("Sin tarjeta, intento " + fallos
+                                    + (r == null ? " (el PN532 no contestó)" : " rx " + Pn532Protocol.hex(r)));
+                        }
+                        Thread.sleep(150);
                         continue;
                     }
                 }
