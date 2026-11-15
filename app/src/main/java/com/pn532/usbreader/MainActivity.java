@@ -146,14 +146,21 @@ public class MainActivity extends Activity implements Pn532.Log {
         }
     }
 
+    private void limpiarChip() {
+        pn532.transceive(Pn532Protocol.commandRaw(0x52, new byte[] { 1 }), 300);
+        pn532.transceive(Pn532Protocol.commandRaw(0x14, new byte[] { 1, 0x14, 1 }), 600);
+    }
+
     private void bucleRelay() {
         int tg = 0;
         int fallos = 0;
+        log("Limpiando estado del chip");
+        limpiarChip();
         while (relay) {
             try {
                 if (tg == 0) {
                     byte[] r = pn532.transceive(
-                            Pn532Protocol.commandRaw(0x4A, new byte[] { 1, 0 }), 400);
+                            Pn532Protocol.commandRaw(0x4A, new byte[] { 1, 0 }), 3000);
                     boolean hay = r != null && r.length > 2
                             && (r[1] & 0xff) == 0x4b && (r[2] & 0xff) == 1;
                     if (hay) {
@@ -163,18 +170,22 @@ public class MainActivity extends Activity implements Pn532.Log {
                         runOnUiThread(() -> cardInfo.setText("Tarjeta activada"));
                     } else {
                         fallos++;
-                        if (fallos == 1 || fallos % 10 == 0) {
+                        if (fallos == 1 || fallos % 5 == 0) {
                             log("Sin tarjeta, intento " + fallos
                                     + (r == null ? " (el PN532 no contestó)" : " rx " + Pn532Protocol.hex(r)));
                         }
-                        Thread.sleep(150);
+                        if (fallos % 15 == 0) {
+                            log("Reinicializando chip");
+                            limpiarChip();
+                        }
+                        Thread.sleep(300);
                         continue;
                     }
                 }
                 byte[] apdu = Puente.I.siguiente(200);
                 if (apdu == null) continue;
                 byte[] params = Pn532Protocol.concat(new byte[] { (byte) tg }, apdu);
-                byte[] r = pn532.transceive(Pn532Protocol.commandRaw(0x40, params), 1200);
+                byte[] r = pn532.transceive(Pn532Protocol.commandRaw(0x40, params), 1500);
                 if (r == null || r.length < 3 || (r[1] & 0xff) != 0x41) {
                     Puente.I.responder(new byte[] { 0x6F, 0x00 });
                     tg = 0;
