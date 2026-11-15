@@ -36,6 +36,7 @@ public class MainActivity extends Activity implements Pn532.Log {
     private volatile boolean relay;
     private Thread hiloRelay;
     private UsbDevice pendiente;
+    private volatile int ultimoEstado = -1;
 
     private final BroadcastReceiver permissionReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
@@ -160,10 +161,13 @@ public class MainActivity extends Activity implements Pn532.Log {
     }
 
     private byte[] enviar(byte[] apdu, int tg) {
+        ultimoEstado = -1;
         byte[] params = Pn532Protocol.concat(new byte[] { (byte) tg }, apdu);
         byte[] r = pn532.transceive(Pn532Protocol.commandRaw(0x40, params), 1500);
-        if (r == null || r.length < 3 || (r[1] & 0xff) != 0x41) return null;
-        if ((r[2] & 0xff) != 0) return null;
+        if (r == null) { ultimoEstado = -2; return null; }
+        if (r.length < 3 || (r[1] & 0xff) != 0x41) { ultimoEstado = -3; return null; }
+        ultimoEstado = r[2] & 0xff;
+        if (ultimoEstado != 0) return null;
         byte[] datos = Arrays.copyOfRange(r, 3, r.length);
         return datos.length == 0 ? null : datos;
     }
@@ -177,7 +181,7 @@ public class MainActivity extends Activity implements Pn532.Log {
         log("Reactivo y repongo " + historial.size() + " comando(s) de contexto");
         for (byte[] h : historial) {
             byte[] resp = enviar(h, 1);
-            log("  repongo " + Pn532Protocol.hex(h) + (resp == null ? " falló" : " ok"));
+            log("  repongo " + Pn532Protocol.hex(h) + (resp == null ? " falló (" + ultimoEstado + ")" : " ok"));
             try { Thread.sleep(50); } catch (InterruptedException ignored) { }
         }
         return true;
@@ -213,20 +217,26 @@ public class MainActivity extends Activity implements Pn532.Log {
 
                 byte[] datos = enviar(apdu, tg);
                 if (datos == null) {
-                    log("Reintento 1 sin respuesta en " + Pn532Protocol.hex(apdu));
+                    log("Reintento 1 sin respuesta en " + Pn532Protocol.hex(apdu) + " (estado " + ultimoEstado + ")");
                     for (int intento = 2; intento <= 3 && datos == null; intento++) {
                         Thread.sleep(150);
                         if (!recuperar()) { tg = 0; continue; }
                         tg = 1;
                         datos = enviar(apdu, tg);
-                        if (datos == null) log("Reintento " + intento + " sin respuesta en " + Pn532Protocol.hex(apdu));
+                        if (datos == null) log("Reintento " + intento + " sin respuesta en "
+                                + Pn532Protocol.hex(apdu) + " (estado " + ultimoEstado + ")");
                     }
                 }
 
                 if (datos == null) {
-                    Puente.I.responder(new byte[] { 0x6F, 0x00 });
-                    log("Falló definitivo " + Pn532Protocol.hex(apdu));
-                    tg = 0;
+                    if ((apdu[1] & 0xff) == 0xB2) {
+                        Puente.I.responder(new byte[] { 0x6A, (byte) 0x83 });
+                        log("Falló definitivo " + Pn532Protocol.hex(apdu) + " (estado " + ultimoEstado + "), contesto 6A83");
+                    } else {
+                        Puente.I.responder(new byte[] { 0x6F, 0x00 });
+                        log("Falló definitivo " + Pn532Protocol.hex(apdu) + " (estado " + ultimoEstado + ")");
+                        tg = 0;
+                    }
                     continue;
                 }
 
