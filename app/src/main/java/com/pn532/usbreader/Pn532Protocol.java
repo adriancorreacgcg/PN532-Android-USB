@@ -5,7 +5,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
-/** PN532 standard UART/HSU framing (normal-length frames). */
+/** PN532 standard UART/HSU framing (normal and extended frames). */
 public final class Pn532Protocol {
     private Pn532Protocol() {}
 
@@ -78,7 +78,6 @@ public final class Pn532Protocol {
     }
 
     public static String describeCard(byte[] data) {
-        // InListPassiveTarget response: D5 4B NbTg Tg SENS_RES[2] SEL_RES NFCIDLen NFCID ...
         if (data.length < 8 || (data[0] & 0xff) != 0xd5 || (data[1] & 0xff) != 0x4b)
             return "Respuesta NFC no válida";
         int count = data[2] & 0xff;
@@ -100,7 +99,7 @@ public final class Pn532Protocol {
         return s.toString();
     }
 
-    /** Handles fragmented and coalesced byte chunks from USB serial. */
+    /** Handles fragmented and coalesced byte chunks, normal and extended frames. */
     public static final class Parser {
         private final List<Byte> buffer = new ArrayList<>();
         private final Listener listener;
@@ -118,14 +117,43 @@ public final class Pn532Protocol {
                         !(u(0) == 0 && u(1) == 0 && u(2) == 0xff)) {
                     buffer.remove(0);
                 }
-                if (buffer.size() < 5) {
-                    // Keep at most 2 possible start-of-frame bytes.
-                    if (buffer.size() > 2 &&
-                            !(u(0) == 0 && u(1) == 0 && u(2) == 0xff)) {
-                        while (buffer.size() > 2) buffer.remove(0);
+                if (buffer.size() < 4) return;
+
+                if (u(3) == 0xff) {
+                    // Trama extendida: 00 00 FF FF FF LEN1 LEN2 LCS TFI ... DCS 00
+                    if (buffer.size() < 5) return;
+                    if (u(4) != 0xff) {
+                        buffer.remove(0);
+                        listener.onInvalidFrame();
+                        continue;
                     }
-                    return;
+                    if (buffer.size() < 7) return;
+                    int len = (u(5) << 8) | u(6);
+                    if (buffer.size() < 8) return;
+                    int lcs = u(7);
+                    if (((u(5) + u(6) + lcs) & 0xff) != 0) {
+                        buffer.remove(0);
+                        listener.onInvalidFrame();
+                        continue;
+                    }
+                    int total = 8 + len + 2;
+                    if (buffer.size() < total) return;
+                    int suma = 0;
+                    for (int i = 0; i < len; i++) suma += u(8 + i);
+                    boolean ok = ((suma + u(8 + len)) & 0xff) == 0 && u(9 + len) == 0;
+                    if (!ok) {
+                        buffer.remove(0);
+                        listener.onInvalidFrame();
+                        continue;
+                    }
+                    byte[] payload = new byte[len];
+                    for (int i = 0; i < len; i++) payload[i] = buffer.get(8 + i);
+                    discard(total);
+                    listener.onFrame(payload);
+                    continue;
                 }
+
+                if (buffer.size() < 5) return;
                 int len = u(3);
                 int lcs = u(4);
                 if (len == 0 && lcs == 0xff) {
@@ -146,9 +174,9 @@ public final class Pn532Protocol {
                 }
                 int total = 7 + len;
                 if (buffer.size() < total) return;
-                int sum = 0;
-                for (int i = 0; i < len; i++) sum += u(5 + i);
-                boolean ok = ((sum + u(5 + len)) & 0xff) == 0 && u(6 + len) == 0;
+                int suma = 0;
+                for (int i = 0; i < len; i++) suma += u(5 + i);
+                boolean ok = ((suma + u(5 + len)) & 0xff) == 0 && u(6 + len) == 0;
                 if (!ok) {
                     buffer.remove(0);
                     listener.onInvalidFrame();
