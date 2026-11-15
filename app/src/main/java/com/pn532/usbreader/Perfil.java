@@ -20,19 +20,32 @@ public final class Perfil {
         (byte) 0x90, 0x00
     };
 
+    /** FCI sin 87: en MSD no se anuncia directorio. */
     private static final byte[] FCI = new byte[] {
-        0x6F, 0x20, (byte) 0x84, 0x07,
+        0x6F, 0x1D, (byte) 0x84, 0x07,
         (byte) 0xA0, 0x00, 0x00, 0x00, 0x04, 0x10, 0x10,
-        (byte) 0xA5, 0x15, 0x50, 0x10,
+        (byte) 0xA5, 0x12, 0x50, 0x10,
         0x44, 0x65, 0x62, 0x69, 0x74, 0x20, 0x4D, 0x61, 0x73, 0x74, 0x65,
         0x72, 0x63, 0x61, 0x72, 0x64,
-        (byte) 0x87, 0x01, 0x01,
         (byte) 0x90, 0x00
     };
 
-    /** Formato 1: AIP + pista 2 equivalente. Sin AFL, sin criptograma. */
-    private static final byte[] GPO = new byte[] {
+    private static final byte[] PISTA2 = new byte[] {
+        0x55, 0x79, 0x07, 0x01, 0x61, 0x48, 0x35, 0x35, (byte) 0xD3,
+        0x00, 0x32, 0x01, (byte) 0x94, 0x2F
+    };
+
+    /** Variante 1: formato 1, AIP + pista 2 cruda. */
+    private static final byte[] GPO1 = new byte[] {
         (byte) 0x80, 0x10, 0x19, (byte) 0x80,
+        0x55, 0x79, 0x07, 0x01, 0x61, 0x48, 0x35, 0x35, (byte) 0xD3,
+        0x00, 0x32, 0x01, (byte) 0x94, 0x2F,
+        (byte) 0x90, 0x00
+    };
+
+    /** Variante 2: formato 2, plantilla 77 con 82 y 57. */
+    private static final byte[] GPO2 = new byte[] {
+        0x77, 0x14, (byte) 0x82, 0x02, 0x19, (byte) 0x80, 0x57, 0x0E,
         0x55, 0x79, 0x07, 0x01, 0x61, 0x48, 0x35, 0x35, (byte) 0xD3,
         0x00, 0x32, 0x01, (byte) 0x94, 0x2F,
         (byte) 0x90, 0x00
@@ -49,6 +62,10 @@ public final class Perfil {
     private static final byte[] NO_ENCONTRADO = new byte[] { 0x6A, (byte) 0x82 };
     private static final byte[] NO_SOPORTADO = new byte[] { 0x6D, 0x00 };
 
+    private static volatile int variante = 1;
+
+    public static void variante(int v) { variante = v; }
+
     public static byte[] responder(byte[] apdu) {
         if (apdu.length < 4) return NO_SOPORTADO;
         int ins = apdu[1] & 0xff;
@@ -57,7 +74,7 @@ public final class Perfil {
             if (contiene(apdu, AID_TARJETA)) return FCI;
             return NO_ENCONTRADO;
         }
-        if (ins == 0xA8) return GPO;
+        if (ins == 0xA8) return variante == 2 ? GPO2 : GPO1;
         if (ins == 0xB2) return NO_ENCONTRADO;
         if (ins == 0xAE) return GENAC;
         return NO_SOPORTADO;
