@@ -151,6 +151,11 @@ public class MainActivity extends Activity implements Pn532.Log {
         pn532.transceive(Pn532Protocol.commandRaw(0x14, new byte[] { 1, 0x14, 1 }), 600);
     }
 
+    private boolean activarTarjeta() {
+        byte[] p = pn532.transceive(Pn532Protocol.commandRaw(0x4A, new byte[] { 1, 0 }), 3000);
+        return p != null && p.length > 2 && (p[1] & 0xff) == 0x4b && (p[2] & 0xff) == 1;
+    }
+
     private void bucleRelay() {
         int tg = 0;
         int fallos = 0;
@@ -159,21 +164,14 @@ public class MainActivity extends Activity implements Pn532.Log {
         while (relay) {
             try {
                 if (tg == 0) {
-                    byte[] r = pn532.transceive(
-                            Pn532Protocol.commandRaw(0x4A, new byte[] { 1, 0 }), 3000);
-                    boolean hay = r != null && r.length > 2
-                            && (r[1] & 0xff) == 0x4b && (r[2] & 0xff) == 1;
-                    if (hay) {
+                    if (activarTarjeta()) {
                         tg = 1;
                         fallos = 0;
                         log("Tarjeta activada");
                         runOnUiThread(() -> cardInfo.setText("Tarjeta activada"));
                     } else {
                         fallos++;
-                        if (fallos == 1 || fallos % 5 == 0) {
-                            log("Sin tarjeta, intento " + fallos
-                                    + (r == null ? " (el PN532 no contestó)" : " rx " + Pn532Protocol.hex(r)));
-                        }
+                        if (fallos == 1 || fallos % 5 == 0) log("Sin tarjeta, intento " + fallos);
                         if (fallos % 15 == 0) {
                             log("Reinicializando chip");
                             limpiarChip();
@@ -184,33 +182,41 @@ public class MainActivity extends Activity implements Pn532.Log {
                 }
                 byte[] apdu = Puente.I.siguiente(200);
                 if (apdu == null) continue;
-
                 Thread.sleep(40);
-                byte[] params = Pn532Protocol.concat(new byte[] { (byte) tg }, apdu);
-                byte[] cmd = Pn532Protocol.commandRaw(0x40, params);
-                byte[] r = pn532.transceive(cmd, 1000);
-                if (r == null) {
-                    log("Reintento: " + Pn532Protocol.hex(apdu));
-                    Thread.sleep(150);
-                    r = pn532.transceive(cmd, 1000);
+
+                byte[] datos = null;
+                for (int intento = 1; intento <= 3; intento++) {
+                    if (tg == 0) {
+                        if (activarTarjeta()) {
+                            tg = 1;
+                            log("Reactivada para reintento " + intento);
+                        } else {
+                            Thread.sleep(250);
+                            continue;
+                        }
+                    }
+                    byte[] params = Pn532Protocol.concat(new byte[] { (byte) tg }, apdu);
+                    byte[] r = pn532.transceive(Pn532Protocol.commandRaw(0x40, params), 1500);
+                    if (r == null || r.length < 3 || (r[1] & 0xff) != 0x41) {
+                        tg = 0;
+                        log("Reintento " + intento + " sin respuesta en " + Pn532Protocol.hex(apdu));
+                        Thread.sleep(150);
+                        continue;
+                    }
+                    int estado = r[2] & 0xff;
+                    if (estado != 0) {
+                        tg = 0;
+                        log("Reintento " + intento + " estado PN532 " + estado);
+                        Thread.sleep(150);
+                        continue;
+                    }
+                    datos = Arrays.copyOfRange(r, 3, r.length);
+                    break;
                 }
-                if (r == null || r.length < 3 || (r[1] & 0xff) != 0x41) {
+
+                if (datos == null || datos.length == 0) {
                     Puente.I.responder(new byte[] { 0x6F, 0x00 });
-                    tg = 0;
-                    log("Falló " + Pn532Protocol.hex(apdu)
-                            + (r == null ? " (sin respuesta del chip)" : " rx " + Pn532Protocol.hex(r)));
-                    continue;
-                }
-                int estado = r[2] & 0xff;
-                if (estado != 0) {
-                    Puente.I.responder(new byte[] { 0x6F, 0x00 });
-                    tg = 0;
-                    log("Estado PN532 " + estado + " en " + Pn532Protocol.hex(apdu));
-                    continue;
-                }
-                byte[] datos = Arrays.copyOfRange(r, 3, r.length);
-                if (datos.length == 0) {
-                    Puente.I.responder(new byte[] { 0x6F, 0x00 });
+                    log("Falló definitivo " + Pn532Protocol.hex(apdu));
                     continue;
                 }
                 Puente.I.responder(datos);
