@@ -16,6 +16,34 @@
             android:textSize="16sp"
             android:text="Sin conexión USB" />
 
+        <EditText
+            android:id="@+id/panText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="PAN 16 dígitos"
+            android:inputType="number"
+            android:maxLength="16"
+            android:textSize="14sp" />
+
+        <EditText
+            android:id="@+id/vencText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Vencimiento AAMM"
+            android:inputType="number"
+            android:maxLength="4"
+            android:textSize="14sp" />
+
+        <EditText
+            android:id="@+id/servicioText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Servicio"
+            android:inputType="number"
+            android:maxLength="3"
+            android:text="201"
+            android:textSize="14sp" />
+
         <Button
             android:id="@+id/connectButton"
             android:layout_width="match_parent"
