@@ -184,25 +184,28 @@ public class MainActivity extends Activity implements Pn532.Log {
                 }
                 byte[] apdu = Puente.I.siguiente(200);
                 if (apdu == null) continue;
+
+                Thread.sleep(40);
                 byte[] params = Pn532Protocol.concat(new byte[] { (byte) tg }, apdu);
                 byte[] cmd = Pn532Protocol.commandRaw(0x40, params);
-                byte[] r = pn532.transceive(cmd, 1500);
+                byte[] r = pn532.transceive(cmd, 1000);
                 if (r == null) {
-                    Thread.sleep(60);
-                    r = pn532.transceive(cmd, 1500);
+                    log("Reintento: " + Pn532Protocol.hex(apdu));
+                    Thread.sleep(150);
+                    r = pn532.transceive(cmd, 1000);
                 }
                 if (r == null || r.length < 3 || (r[1] & 0xff) != 0x41) {
                     Puente.I.responder(new byte[] { 0x6F, 0x00 });
                     tg = 0;
-                    log("Sin respuesta de la tarjeta"
-                            + (r == null ? "" : " rx " + Pn532Protocol.hex(r)));
+                    log("Falló " + Pn532Protocol.hex(apdu)
+                            + (r == null ? " (sin respuesta del chip)" : " rx " + Pn532Protocol.hex(r)));
                     continue;
                 }
                 int estado = r[2] & 0xff;
                 if (estado != 0) {
                     Puente.I.responder(new byte[] { 0x6F, 0x00 });
                     tg = 0;
-                    log("Estado PN532 " + estado);
+                    log("Estado PN532 " + estado + " en " + Pn532Protocol.hex(apdu));
                     continue;
                 }
                 byte[] datos = Arrays.copyOfRange(r, 3, r.length);
