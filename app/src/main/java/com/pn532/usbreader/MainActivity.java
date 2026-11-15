@@ -156,10 +156,9 @@ public class MainActivity extends Activity implements Pn532.Log {
 
     private boolean activarTarjeta() {
         byte[] p = pn532.transceive(Pn532Protocol.commandRaw(0x4A, new byte[] { 1, 0 }), 3000);
-        return p != null && p.length > 2 && (p[1] & 0xff) == 0x4b && (p[2] & 0xff) == 1;
+        return p != null && p.length > 2 && (p[1] & 0xff) == 0x4b && (p[2] & 0xff) >= 1;
     }
 
-    /** Devuelve los datos del APDU, o null si no hubo respuesta válida. */
     private byte[] enviar(byte[] apdu, int tg) {
         byte[] params = Pn532Protocol.concat(new byte[] { (byte) tg }, apdu);
         byte[] r = pn532.transceive(Pn532Protocol.commandRaw(0x40, params), 1500);
@@ -169,15 +168,17 @@ public class MainActivity extends Activity implements Pn532.Log {
         return datos.length == 0 ? null : datos;
     }
 
-    /** Reactiva la tarjeta y reconstruye el contexto previo. */
     private boolean recuperar() {
-        if (!activarTarjeta()) return false;
+        if (!activarTarjeta()) {
+            log("No pude reactivar la tarjeta");
+            return false;
+        }
         if (historial.isEmpty()) return true;
         log("Reactivo y repongo " + historial.size() + " comando(s) de contexto");
         for (byte[] h : historial) {
-            if (!activarTarjeta()) return false;
-            enviar(h, 1);
-            try { Thread.sleep(40); } catch (InterruptedException ignored) { }
+            byte[] resp = enviar(h, 1);
+            log("  repongo " + Pn532Protocol.hex(h) + (resp == null ? " falló" : " ok"));
+            try { Thread.sleep(50); } catch (InterruptedException ignored) { }
         }
         return true;
     }
@@ -210,23 +211,22 @@ public class MainActivity extends Activity implements Pn532.Log {
                 if (apdu == null) continue;
                 Thread.sleep(40);
 
-                byte[] datos = null;
-                for (int intento = 1; intento <= 3 && datos == null; intento++) {
-                    if (intento > 1) {
+                byte[] datos = enviar(apdu, tg);
+                if (datos == null) {
+                    log("Reintento 1 sin respuesta en " + Pn532Protocol.hex(apdu));
+                    for (int intento = 2; intento <= 3 && datos == null; intento++) {
                         Thread.sleep(150);
                         if (!recuperar()) { tg = 0; continue; }
                         tg = 1;
-                    }
-                    datos = enviar(apdu, tg);
-                    if (datos == null) {
-                        tg = 0;
-                        log("Reintento " + intento + " sin respuesta en " + Pn532Protocol.hex(apdu));
+                        datos = enviar(apdu, tg);
+                        if (datos == null) log("Reintento " + intento + " sin respuesta en " + Pn532Protocol.hex(apdu));
                     }
                 }
 
                 if (datos == null) {
                     Puente.I.responder(new byte[] { 0x6F, 0x00 });
                     log("Falló definitivo " + Pn532Protocol.hex(apdu));
+                    tg = 0;
                     continue;
                 }
 
