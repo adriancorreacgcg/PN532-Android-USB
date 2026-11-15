@@ -229,6 +229,7 @@ public class MainActivity extends Activity implements Pn532.Log {
     }
 
     private boolean recuperar() {
+        pn532.transceive(Pn532Protocol.commandRaw(0x14, new byte[] { 1, 0x14, 1 }), 600);
         if (!activarTarjeta()) {
             log("No pude reactivar la tarjeta");
             return false;
@@ -312,13 +313,14 @@ public class MainActivity extends Activity implements Pn532.Log {
         catch (Exception ignored) { }
     }
 
-    /** Mini sesión de prueba: firmware, select, gpo y el registro que falla. */
+    /** Mini sesión de prueba: firmware, init, select, gpo y el registro que falla. */
     private void prueba() {
         if (!pn532.abierto()) { showStatus("Conecta el USB primero"); return; }
         new Thread(() -> {
             log("== prueba ==");
             byte[] f = pn532.transceive(Pn532Protocol.commandRaw(0x02, new byte[0]), 1500);
             log("firmware: " + (f == null ? "sin respuesta" : Pn532Protocol.hex(f)));
+            log("init: " + (pn532.transceive(Pn532Protocol.commandRaw(0x14, new byte[] { 1, 0x14, 1 }), 800) == null ? "sin respuesta" : "ok"));
             if (!activarTarjeta()) { log("sin tarjeta en el lector"); return; }
             log("tarjeta activada");
             byte[] sel = new byte[] { 0x00, (byte) 0xA4, 0x04, 0x00, 0x07,
