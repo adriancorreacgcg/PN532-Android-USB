@@ -37,6 +37,7 @@ public class MainActivity extends Activity implements Pn532.Log {
     private Pn532 pn532;
     private volatile boolean relay;
     private volatile boolean estatico;
+    private volatile boolean aprender;
     private Thread hiloRelay;
     private UsbDevice pendiente;
     private volatile int ultimoEstado = -1;
@@ -57,6 +58,7 @@ public class MainActivity extends Activity implements Pn532.Log {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_main);
+        Aprendiz.iniciar(this);
         usbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
         statusText = findViewById(R.id.status);
         cardInfo = findViewById(R.id.cardInfo);
@@ -67,6 +69,7 @@ public class MainActivity extends Activity implements Pn532.Log {
             if (pn532.abierto()) { detenerRelay(); pn532.cerrar(); showStatus("Sin conexión USB"); }
             else conectar();
         });
+        findViewById(R.id.aprenderButton).setOnClickListener(v -> iniciarAprender());
         findViewById(R.id.relayButton).setOnClickListener(v -> iniciarRelay());
         findViewById(R.id.estaticoButton).setOnClickListener(v -> iniciarEstatico(1));
         findViewById(R.id.estatico2Button).setOnClickListener(v -> iniciarEstatico(2));
@@ -84,6 +87,7 @@ public class MainActivity extends Activity implements Pn532.Log {
             registerReceiver(permissionReceiver, filter);
         }
         log("Conecta el CP210x por OTG y presiona Conectar.");
+        log("Guardadas: " + Aprendiz.cuantas() + " respuestas.");
     }
 
     private void conectar() {
@@ -123,6 +127,7 @@ public class MainActivity extends Activity implements Pn532.Log {
         if (!pn532.abierto()) { showStatus("Conecta el USB primero"); return; }
         if (relay) return;
         estatico = false;
+        aprender = false;
         Puente.I.activar();
         historial.clear();
         relay = true;
@@ -133,13 +138,31 @@ public class MainActivity extends Activity implements Pn532.Log {
         log("Relay activo: tarjeta en el lector, teléfono en la terminal.");
     }
 
+    private void iniciarAprender() {
+        if (!pn532.abierto()) { showStatus("Conecta el USB primero"); return; }
+        if (relay) return;
+        estatico = false;
+        aprender = true;
+        Aprendiz.limpiar();
+        Puente.I.activar();
+        historial.clear();
+        relay = true;
+        hiloRelay = new Thread(this::bucleRelay);
+        hiloRelay.start();
+        preferir(true);
+        showStatus("Aprendiendo");
+        log("Aprendiendo: tarjeta en el lector, presenta el teléfono.");
+    }
+
     private void iniciarEstatico(int variante) {
         detenerRelay();
+        aprender = false;
         Perfil.variante(variante);
         Puente.I.activarEstatico();
         preferir(true);
         showStatus(variante == 2 ? "Estático 2 activo" : "Estático activo");
         log("== estático " + variante + " activo: sin USB, sin tarjeta ==");
+        log("Guardadas: " + Aprendiz.cuantas() + " respuestas.");
         estatico = true;
         new Thread(() -> {
             while (estatico) {
@@ -339,6 +362,12 @@ public class MainActivity extends Activity implements Pn532.Log {
                     historial.add(apdu);
                 } else if ((apdu[1] & 0xff) == 0xA8) {
                     historial.add(apdu);
+                }
+
+                if (aprender) {
+                    Aprendiz.guardar(apdu, datos);
+                    log("guardo " + Pn532Protocol.hex(apdu));
+                    showStatus("Aprendidas: " + Aprendiz.cuantas());
                 }
 
                 Puente.I.responder(datos);
