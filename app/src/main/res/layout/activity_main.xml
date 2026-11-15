@@ -23,6 +23,12 @@
             android:text="Conectar / Desconectar" />
 
         <Button
+            android:id="@+id/aprenderButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Aprender tarjeta (USB)" />
+
+        <Button
             android:id="@+id/relayButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -38,7 +44,7 @@
             android:id="@+id/estatico2Button"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Modo estático 2 (formato 77)" />
+            android:text="Modo estático 2 (banda)" />
 
         <Button
             android:id="@+id/stopButton"
