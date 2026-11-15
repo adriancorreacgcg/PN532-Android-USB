@@ -67,6 +67,7 @@ public class MainActivity extends Activity implements Pn532.Log {
             else conectar();
         });
         findViewById(R.id.relayButton).setOnClickListener(v -> iniciarRelay());
+        findViewById(R.id.estaticoButton).setOnClickListener(v -> iniciarEstatico());
         findViewById(R.id.stopButton).setOnClickListener(v -> detenerRelay());
         findViewById(R.id.firmwareButton).setOnClickListener(v -> capturar());
         findViewById(R.id.clearButton).setOnClickListener(v -> {
@@ -129,13 +130,21 @@ public class MainActivity extends Activity implements Pn532.Log {
         log("Relay activo: tarjeta en el lector, teléfono en la terminal.");
     }
 
+    private void iniciarEstatico() {
+        detenerRelay();
+        Puente.I.activarEstatico();
+        preferir(true);
+        showStatus("Modo estático activo");
+        log("Modo estático: se presenta el perfil guardado, sin tarjeta ni relay.");
+    }
+
     private void detenerRelay() {
         relay = false;
         Puente.I.desactivar();
         hiloRelay = null;
         preferir(false);
-        showStatus("Relay detenido");
-        log("Relay detenido");
+        showStatus("Detenido");
+        log("Detenido");
     }
 
     private void preferir(boolean activo) {
@@ -384,9 +393,7 @@ public class MainActivity extends Activity implements Pn532.Log {
 
             byte[] todos = todo.toByteArray();
             imprimirTag("PAN 5A", 0x5A, todos);
-            imprimirTag("fecha 5F24", 0x5F24 & 0xff, todos);
             imprimirTag("pista2 57", 0x57, todos);
-            imprimirTag("9F6E", 0x6E, todos);
             log("== fin captura ==");
         }).start();
     }
