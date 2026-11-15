@@ -17,7 +17,6 @@ import android.widget.TextView;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 
 import com.hoho.android.usbserial.driver.UsbSerialDriver;
 import com.hoho.android.usbserial.driver.UsbSerialProber;
@@ -126,7 +125,7 @@ public class MainActivity extends Activity implements Pn532.Log {
     private void detenerRelay() {
         relay = false;
         Puente.I.desactivar();
-        if (hiloRelay != null) { hiloRelay = null; }
+        hiloRelay = null;
         preferir(false);
         showStatus("Relay detenido");
         log("Relay detenido");
@@ -157,7 +156,7 @@ public class MainActivity extends Activity implements Pn532.Log {
                     if (r != null && r.length > 2 && (r[1] & 0xff) == 0x4b && (r[2] & 0xff) == 1) {
                         tg = 1;
                         log("Tarjeta activada");
-                        cardInfo.setText("Tarjeta activada");
+                        runOnUiThread(() -> cardInfo.setText("Tarjeta activada"));
                     } else {
                         Thread.sleep(120);
                         continue;
@@ -181,6 +180,10 @@ public class MainActivity extends Activity implements Pn532.Log {
                     continue;
                 }
                 byte[] datos = Arrays.copyOfRange(r, 3, r.length);
+                if (datos.length == 0) {
+                    Puente.I.responder(new byte[] { 0x6F, 0x00 });
+                    continue;
+                }
                 Puente.I.responder(datos);
                 log("APDU " + Pn532Protocol.hex(apdu) + " -> " + Pn532Protocol.hex(datos));
             } catch (Exception e) {
