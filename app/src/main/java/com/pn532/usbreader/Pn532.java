@@ -4,6 +4,7 @@ import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
 
+import com.hoho.android.usbserial.driver.UsbSerialDriver;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
 import com.hoho.android.usbserial.driver.UsbSerialProber;
 import com.hoho.android.usbserial.util.SerialInputOutputManager;
@@ -28,8 +29,9 @@ public class Pn532 implements SerialInputOutputManager.Listener {
         this.log = l;
         UsbDeviceConnection conexion = gestor.openDevice(dispositivo);
         if (conexion == null) throw new IOException("No se pudo abrir el dispositivo");
-        UsbSerialPort p = UsbSerialProber.getDefaultProber().probeDevice(dispositivo)
-                .getPorts().get(0);
+        UsbSerialDriver driver = UsbSerialProber.getDefaultProber().probeDevice(dispositivo);
+        if (driver == null) throw new IOException("Driver no reconocido para el dispositivo");
+        UsbSerialPort p = driver.getPorts().get(0);
         p.open(conexion);
         p.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE);
         p.setFlowControl(UsbSerialPort.FlowControl.NONE);
