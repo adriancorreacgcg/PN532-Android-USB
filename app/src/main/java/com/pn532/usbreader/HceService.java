@@ -15,7 +15,9 @@ public class HceService extends HostApduService {
             int ins = apdu.length > 1 ? (apdu[1] & 0xff) : 0;
             int modo = Perfil.varianteActual();
             byte[] r;
-            if (modo == 3 && ins == 0xA8) {
+            if (modo == 3 && ins == 0xA4 && Perfil.esAid(apdu)) {
+                r = Perfil.fciBanda();
+            } else if (modo == 3 && ins == 0xA8) {
                 r = Perfil.gpoBanda();
             } else if (modo == 3 && ins == 0xAE) {
                 r = FALLA;
