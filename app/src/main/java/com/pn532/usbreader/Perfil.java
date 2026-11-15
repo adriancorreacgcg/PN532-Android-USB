@@ -4,6 +4,14 @@ package com.pn532.usbreader;
 public final class Perfil {
     private Perfil() {}
 
+    private static final byte[] AID_PPSE = new byte[] {
+        0x32, 0x50, 0x41, 0x59, 0x2E, 0x53, 0x59, 0x53, 0x2E, 0x44, 0x44, 0x46, 0x30, 0x31
+    };
+
+    private static final byte[] AID_TARJETA = new byte[] {
+        (byte) 0xA0, 0x00, 0x00, 0x00, 0x04, 0x10, 0x10
+    };
+
     private static final byte[] PPSE = new byte[] {
         0x6F, 0x22, (byte) 0x84, 0x0E, 0x32, 0x50, 0x41, 0x59, 0x2E, 0x53,
         0x59, 0x53, 0x2E, 0x44, 0x44, 0x46, 0x30, 0x31,
@@ -13,9 +21,9 @@ public final class Perfil {
     };
 
     private static final byte[] FCI = new byte[] {
-        0x6F, 0x29, (byte) 0x84, 0x07,
+        0x6F, 0x20, (byte) 0x84, 0x07,
         (byte) 0xA0, 0x00, 0x00, 0x00, 0x04, 0x10, 0x10,
-        (byte) 0xA5, 0x1E, 0x50, 0x10,
+        (byte) 0xA5, 0x15, 0x50, 0x10,
         0x44, 0x65, 0x62, 0x69, 0x74, 0x20, 0x4D, 0x61, 0x73, 0x74, 0x65,
         0x72, 0x63, 0x61, 0x72, 0x64,
         (byte) 0x87, 0x01, 0x01,
@@ -45,8 +53,8 @@ public final class Perfil {
         if (apdu.length < 4) return NO_SOPORTADO;
         int ins = apdu[1] & 0xff;
         if (ins == 0xA4) {
-            if (contiene(apdu, "2PAY.SYS.DDF01")) return PPSE;
-            if (contiene(apdu, "\u00A0\u0000\u0000\u0000\u0004\u0010\u0010")) return FCI;
+            if (contiene(apdu, AID_PPSE)) return PPSE;
+            if (contiene(apdu, AID_TARJETA)) return FCI;
             return NO_ENCONTRADO;
         }
         if (ins == 0xA8) return GPO;
@@ -55,8 +63,7 @@ public final class Perfil {
         return NO_SOPORTADO;
     }
 
-    private static boolean contiene(byte[] datos, String texto) {
-        byte[] busca = texto.getBytes();
+    private static boolean contiene(byte[] datos, byte[] busca) {
         for (int i = 0; i + busca.length <= datos.length; i++) {
             boolean ok = true;
             for (int j = 0; j < busca.length; j++) {
