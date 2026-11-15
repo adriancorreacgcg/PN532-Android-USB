@@ -13,6 +13,7 @@ import android.nfc.NfcAdapter;
 import android.nfc.cardemulation.CardEmulation;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.WindowManager;
 import android.widget.TextView;
 
 import java.io.ByteArrayOutputStream;
@@ -53,6 +54,7 @@ public class MainActivity extends Activity implements Pn532.Log {
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_main);
         usbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
         statusText = findViewById(R.id.status);
@@ -159,7 +161,7 @@ public class MainActivity extends Activity implements Pn532.Log {
     private boolean activarTarjeta() {
         byte[] p = pn532.transceive(Pn532Protocol.commandRaw(0x4A, new byte[] { 1, 0 }), 3000);
         if (p == null) { log("  poll sin respuesta"); return false; }
-        log("  poll: " + Pn532Protocol.hex(p));
+        log("  poll: " + corto(p));
         return p.length > 2 && (p[1] & 0xff) == 0x4b && (p[2] & 0xff) >= 1;
     }
 
@@ -227,7 +229,8 @@ public class MainActivity extends Activity implements Pn532.Log {
 
     private byte[] leerRegistro(byte[] apdu, int tg) {
         if (apdu.length < 5) return null;
-        byte[] r = leerRegistroCon(apdu, tg, 0x40, "64");
+        byte[] r = leerRegistroCon(apdu, tg, 0x00, "completo");
+        if (r == null) r = leerRegistroCon(apdu, tg, 0x40, "64");
         if (r == null) r = leerRegistroCon(apdu, tg, 0x20, "32");
         return r;
     }
@@ -313,7 +316,7 @@ public class MainActivity extends Activity implements Pn532.Log {
                 }
 
                 Puente.I.responder(datos);
-                log("APDU " + Pn532Protocol.hex(apdu) + " -> " + Pn532Protocol.hex(datos));
+                log("APDU " + Pn532Protocol.hex(apdu) + " -> " + corto(datos));
             } catch (Exception e) {
                 log("Error relay: " + e.getMessage());
             }
@@ -322,7 +325,6 @@ public class MainActivity extends Activity implements Pn532.Log {
         catch (Exception ignored) { }
     }
 
-    /** Mini sesión de prueba: firmware, init, select, gpo y el registro que falla. */
     private void prueba() {
         if (!pn532.abierto()) { showStatus("Conecta el USB primero"); return; }
         new Thread(() -> {
@@ -337,13 +339,16 @@ public class MainActivity extends Activity implements Pn532.Log {
             log("select: " + (enviar(sel, 1) == null ? "falló (" + ultimoEstado + ")" : "ok"));
             byte[] gpo = new byte[] { (byte) 0x80, (byte) 0xA8, 0x00, 0x00, 0x02, (byte) 0x83, 0x00, 0x00 };
             log("gpo: " + (enviar(gpo, 1) == null ? "falló (" + ultimoEstado + ")" : "ok"));
-            byte[] r6 = new byte[] { 0x00, (byte) 0xB2, 0x01, 0x34, 0x00 };
-            byte[] d6 = leerRegistro(r6, 1);
-            log("registro SFI6 r1: " + (d6 == null ? "falló (" + ultimoEstado + ")" : Pn532Protocol.hex(d6)));
-            byte[] r3 = new byte[] { 0x00, (byte) 0xB2, 0x01, 0x1C, 0x00 };
-            byte[] d3 = leerRegistro(r3, 1);
-            log("registro SFI3 r1 (control): " + (d3 == null ? "falló (" + ultimoEstado + ")" : "ok " + d3.length + " bytes"));
+            byte[] r2 = new byte[] { 0x00, (byte) 0xB2, 0x02, 0x14, 0x00 };
+            byte[] d2 = leerRegistro(r2, 1);
+            log("registro SFI2 r2: " + (d2 == null ? "falló (" + ultimoEstado + ")" : corto(d2)));
         }).start();
+    }
+
+    private String corto(byte[] d) {
+        int n = Math.min(d.length, 24);
+        String s = Pn532Protocol.hex(Arrays.copyOfRange(d, 0, n));
+        return d.length > n ? s + " …(" + d.length + " bytes)" : s;
     }
 
     private void showStatus(String texto) {
@@ -357,7 +362,7 @@ public class MainActivity extends Activity implements Pn532.Log {
     private void log(String mensaje) {
         runOnUiThread(() -> {
             logBuffer.append(mensaje).append('\n');
-            if (logBuffer.length() > 16000) logBuffer.delete(0, logBuffer.length() - 10000);
+            if (logBuffer.length() > 16000) logBuffer.delete(0, logBuffer.length() - 8000);
             logText.setText(logBuffer.toString());
         });
     }
