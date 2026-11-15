@@ -21,13 +21,14 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Verificar SDK preinstalado en GitHub Actions
+      - name: Configurar Android SDK del runner
         run: |
           echo "ANDROID_HOME=$ANDROID_HOME"
-          sdkmanager --version
-
-      - name: Instalar Android 35
-        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)"
+          test -n "$SDKMANAGER"
+          "$SDKMANAGER" --version
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" 'platforms;android-35' 'build-tools;35.0.0'
 
       - name: Preparar Gradle
         uses: gradle/actions/setup-gradle@v4
