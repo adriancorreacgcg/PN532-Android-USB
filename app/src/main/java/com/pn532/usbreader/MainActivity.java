@@ -36,6 +36,7 @@ public class MainActivity extends Activity implements Pn532.Log {
     private final List<byte[]> historial = new ArrayList<>();
     private Pn532 pn532;
     private volatile boolean relay;
+    private volatile boolean estatico;
     private Thread hiloRelay;
     private UsbDevice pendiente;
     private volatile int ultimoEstado = -1;
@@ -67,7 +68,8 @@ public class MainActivity extends Activity implements Pn532.Log {
             else conectar();
         });
         findViewById(R.id.relayButton).setOnClickListener(v -> iniciarRelay());
-        findViewById(R.id.estaticoButton).setOnClickListener(v -> iniciarEstatico());
+        findViewById(R.id.estaticoButton).setOnClickListener(v -> iniciarEstatico(1));
+        findViewById(R.id.estatico2Button).setOnClickListener(v -> iniciarEstatico(2));
         findViewById(R.id.stopButton).setOnClickListener(v -> detenerRelay());
         findViewById(R.id.firmwareButton).setOnClickListener(v -> capturar());
         findViewById(R.id.clearButton).setOnClickListener(v -> {
@@ -120,6 +122,7 @@ public class MainActivity extends Activity implements Pn532.Log {
     private void iniciarRelay() {
         if (!pn532.abierto()) { showStatus("Conecta el USB primero"); return; }
         if (relay) return;
+        estatico = false;
         Puente.I.activar();
         historial.clear();
         relay = true;
@@ -130,16 +133,32 @@ public class MainActivity extends Activity implements Pn532.Log {
         log("Relay activo: tarjeta en el lector, teléfono en la terminal.");
     }
 
-    private void iniciarEstatico() {
+    private void iniciarEstatico(int variante) {
         detenerRelay();
+        Perfil.variante(variante);
         Puente.I.activarEstatico();
         preferir(true);
-        showStatus("Modo estático activo");
-        log("Modo estático: se presenta el perfil guardado, sin tarjeta ni relay.");
+        showStatus(variante == 2 ? "Estático 2 activo" : "Estático activo");
+        log("== estático " + variante + " activo: sin USB, sin tarjeta ==");
+        estatico = true;
+        new Thread(() -> {
+            while (estatico) {
+                String s = Puente.I.sacarBitacora();
+                if (!s.isEmpty()) log(s.trim());
+                try {
+                    Thread.sleep(250);
+                } catch (InterruptedException e) {
+                    return;
+                }
+            }
+            String resto = Puente.I.sacarBitacora();
+            if (!resto.isEmpty()) log(resto.trim());
+        }).start();
     }
 
     private void detenerRelay() {
         relay = false;
+        estatico = false;
         Puente.I.desactivar();
         hiloRelay = null;
         preferir(false);
@@ -443,6 +462,7 @@ public class MainActivity extends Activity implements Pn532.Log {
 
     @Override protected void onDestroy() {
         relay = false;
+        estatico = false;
         Puente.I.desactivar();
         pn532.cerrar();
         try { unregisterReceiver(permissionReceiver); } catch (Exception ignored) { }
