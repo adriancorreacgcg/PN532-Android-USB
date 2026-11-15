@@ -14,6 +14,7 @@ import android.nfc.cardemulation.CardEmulation;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.WindowManager;
+import android.widget.EditText;
 import android.widget.TextView;
 
 import java.io.ByteArrayOutputStream;
@@ -32,6 +33,9 @@ public class MainActivity extends Activity implements Pn532.Log {
     private TextView statusText;
     private TextView cardInfo;
     private TextView logText;
+    private EditText panText;
+    private EditText vencText;
+    private EditText servicioText;
     private final StringBuilder logBuffer = new StringBuilder();
     private final List<byte[]> historial = new ArrayList<>();
     private Pn532 pn532;
@@ -59,10 +63,17 @@ public class MainActivity extends Activity implements Pn532.Log {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_main);
         Aprendiz.iniciar(this);
+        Datos.iniciar(this);
         usbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
         statusText = findViewById(R.id.status);
         cardInfo = findViewById(R.id.cardInfo);
         logText = findViewById(R.id.logText);
+        panText = findViewById(R.id.panText);
+        vencText = findViewById(R.id.vencText);
+        servicioText = findViewById(R.id.servicioText);
+        panText.setText(Datos.pan);
+        vencText.setText(Datos.venc);
+        servicioText.setText(Datos.servicio);
         pn532 = new Pn532();
 
         findViewById(R.id.connectButton).setOnClickListener(v -> {
@@ -157,11 +168,16 @@ public class MainActivity extends Activity implements Pn532.Log {
     private void iniciarEstatico(int variante) {
         detenerRelay();
         aprender = false;
+        Datos.pan = panText.getText().toString();
+        Datos.venc = vencText.getText().toString();
+        Datos.servicio = servicioText.getText().toString();
         Perfil.variante(variante);
         Puente.I.activarEstatico();
         preferir(true);
         showStatus(variante == 2 ? "Estático 2 activo" : "Estático activo");
-        log("== estático " + variante + " activo: sin USB, sin tarjeta ==");
+        log("== estático " + variante + " ==");
+        log("PAN " + Datos.soloDigitos(Datos.pan) + " venc " + Datos.soloDigitos(Datos.venc)
+                + " serv " + Datos.soloDigitos(Datos.servicio));
         log("Guardadas: " + Aprendiz.cuantas() + " respuestas.");
         estatico = true;
         new Thread(() -> {
@@ -366,6 +382,7 @@ public class MainActivity extends Activity implements Pn532.Log {
 
                 if (aprender) {
                     Aprendiz.guardar(apdu, datos);
+                    Datos.guardarOriginal(datos);
                     log("guardo " + Pn532Protocol.hex(apdu));
                     showStatus("Aprendidas: " + Aprendiz.cuantas());
                 }
