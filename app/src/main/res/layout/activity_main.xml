@@ -29,16 +29,22 @@
             android:text="Iniciar relay" />
 
         <Button
+            android:id="@+id/estaticoButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Modo estático" />
+
+        <Button
             android:id="@+id/stopButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Detener relay" />
+            android:text="Detener" />
 
         <Button
             android:id="@+id/firmwareButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Probar firmware" />
+            android:text="Capturar tarjeta" />
 
         <Button
             android:id="@+id/clearButton"
