@@ -75,6 +75,12 @@
             android:text="Modo estático 2 (banda)" />
 
         <Button
+            android:id="@+id/estatico3Button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Modo estático 3 (banda forzada)" />
+
+        <Button
             android:id="@+id/stopButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
