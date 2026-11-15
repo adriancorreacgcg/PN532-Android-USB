@@ -84,6 +84,7 @@ public class MainActivity extends Activity implements Pn532.Log {
         findViewById(R.id.relayButton).setOnClickListener(v -> iniciarRelay());
         findViewById(R.id.estaticoButton).setOnClickListener(v -> iniciarEstatico(1));
         findViewById(R.id.estatico2Button).setOnClickListener(v -> iniciarEstatico(2));
+        findViewById(R.id.estatico3Button).setOnClickListener(v -> iniciarEstatico(3));
         findViewById(R.id.stopButton).setOnClickListener(v -> detenerRelay());
         findViewById(R.id.firmwareButton).setOnClickListener(v -> capturar());
         findViewById(R.id.clearButton).setOnClickListener(v -> {
@@ -174,7 +175,8 @@ public class MainActivity extends Activity implements Pn532.Log {
         Perfil.variante(variante);
         Puente.I.activarEstatico();
         preferir(true);
-        showStatus(variante == 2 ? "Estático 2 activo" : "Estático activo");
+        showStatus(variante == 3 ? "Banda forzada activa"
+                : variante == 2 ? "Estático 2 activo" : "Estático activo");
         log("== estático " + variante + " ==");
         log("PAN " + Datos.soloDigitos(Datos.pan) + " venc " + Datos.soloDigitos(Datos.venc)
                 + " serv " + Datos.soloDigitos(Datos.servicio));
