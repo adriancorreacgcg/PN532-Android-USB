@@ -15,6 +15,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.widget.TextView;
 
+import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -172,6 +173,50 @@ public class MainActivity extends Activity implements Pn532.Log {
         return datos.length == 0 ? null : datos;
     }
 
+    /** READ RECORD por partes para no rebasar el buffer del PN532. */
+    private byte[] leerRegistro(byte[] apdu, int tg) {
+        if (apdu.length < 5) return null;
+        byte[] mod = apdu.clone();
+        mod[4] = 0x40;
+        ByteArrayOutputStream acum = new ByteArrayOutputStream();
+        byte[] r = enviar(mod, tg);
+        if (r == null) return null;
+        for (int vuelta = 0; vuelta < 8; vuelta++) {
+            if (r.length < 2) return null;
+            int sw1 = r[r.length - 2] & 0xff;
+            int sw2 = r[r.length - 1] & 0xff;
+            if (sw1 == 0x90 && sw2 == 0x00) {
+                acum.write(r, 0, r.length - 2);
+                byte[] cuerpo = acum.toByteArray();
+                byte[] fin = Arrays.copyOf(cuerpo, cuerpo.length + 2);
+                fin[cuerpo.length] = (byte) 0x90;
+                fin[cuerpo.length + 1] = 0x00;
+                return fin;
+            }
+            if (sw1 == 0x61) {
+                acum.write(r, 0, r.length - 2);
+                byte[] gr = new byte[] { 0x00, (byte) 0xC0, 0x00, 0x00, (byte) sw2 };
+                r = enviar(gr, tg);
+                if (r == null) return null;
+                continue;
+            }
+            if (sw1 == 0x6C) {
+                byte[] otro = apdu.clone();
+                otro[4] = (byte) sw2;
+                r = enviar(otro, tg);
+                if (r == null) return null;
+                continue;
+            }
+            return r;
+        }
+        return null;
+    }
+
+    private byte[] intercambiar(byte[] apdu, int tg) {
+        if ((apdu[1] & 0xff) == 0xB2) return leerRegistro(apdu, tg);
+        return enviar(apdu, tg);
+    }
+
     private boolean recuperar() {
         if (!activarTarjeta()) {
             log("No pude reactivar la tarjeta");
@@ -215,14 +260,14 @@ public class MainActivity extends Activity implements Pn532.Log {
                 if (apdu == null) continue;
                 Thread.sleep(40);
 
-                byte[] datos = enviar(apdu, tg);
+                byte[] datos = intercambiar(apdu, tg);
                 if (datos == null) {
                     log("Reintento 1 sin respuesta en " + Pn532Protocol.hex(apdu) + " (estado " + ultimoEstado + ")");
                     for (int intento = 2; intento <= 3 && datos == null; intento++) {
                         Thread.sleep(150);
                         if (!recuperar()) { tg = 0; continue; }
                         tg = 1;
-                        datos = enviar(apdu, tg);
+                        datos = intercambiar(apdu, tg);
                         if (datos == null) log("Reintento " + intento + " sin respuesta en "
                                 + Pn532Protocol.hex(apdu) + " (estado " + ultimoEstado + ")");
                     }
