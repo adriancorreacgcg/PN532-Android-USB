@@ -185,11 +185,17 @@ public class MainActivity extends Activity implements Pn532.Log {
                 byte[] apdu = Puente.I.siguiente(200);
                 if (apdu == null) continue;
                 byte[] params = Pn532Protocol.concat(new byte[] { (byte) tg }, apdu);
-                byte[] r = pn532.transceive(Pn532Protocol.commandRaw(0x40, params), 1500);
+                byte[] cmd = Pn532Protocol.commandRaw(0x40, params);
+                byte[] r = pn532.transceive(cmd, 1500);
+                if (r == null) {
+                    Thread.sleep(60);
+                    r = pn532.transceive(cmd, 1500);
+                }
                 if (r == null || r.length < 3 || (r[1] & 0xff) != 0x41) {
                     Puente.I.responder(new byte[] { 0x6F, 0x00 });
                     tg = 0;
-                    log("Sin respuesta de la tarjeta");
+                    log("Sin respuesta de la tarjeta"
+                            + (r == null ? "" : " rx " + Pn532Protocol.hex(r)));
                     continue;
                 }
                 int estado = r[2] & 0xff;
