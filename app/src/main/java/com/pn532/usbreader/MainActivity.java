@@ -15,6 +15,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.widget.TextView;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -30,6 +31,7 @@ public class MainActivity extends Activity implements Pn532.Log {
     private TextView cardInfo;
     private TextView logText;
     private final StringBuilder logBuffer = new StringBuilder();
+    private final List<byte[]> historial = new ArrayList<>();
     private Pn532 pn532;
     private volatile boolean relay;
     private Thread hiloRelay;
@@ -114,6 +116,7 @@ public class MainActivity extends Activity implements Pn532.Log {
         if (!pn532.abierto()) { showStatus("Conecta el USB primero"); return; }
         if (relay) return;
         Puente.I.activar();
+        historial.clear();
         relay = true;
         hiloRelay = new Thread(this::bucleRelay);
         hiloRelay.start();
@@ -156,6 +159,29 @@ public class MainActivity extends Activity implements Pn532.Log {
         return p != null && p.length > 2 && (p[1] & 0xff) == 0x4b && (p[2] & 0xff) == 1;
     }
 
+    /** Devuelve los datos del APDU, o null si no hubo respuesta válida. */
+    private byte[] enviar(byte[] apdu, int tg) {
+        byte[] params = Pn532Protocol.concat(new byte[] { (byte) tg }, apdu);
+        byte[] r = pn532.transceive(Pn532Protocol.commandRaw(0x40, params), 1500);
+        if (r == null || r.length < 3 || (r[1] & 0xff) != 0x41) return null;
+        if ((r[2] & 0xff) != 0) return null;
+        byte[] datos = Arrays.copyOfRange(r, 3, r.length);
+        return datos.length == 0 ? null : datos;
+    }
+
+    /** Reactiva la tarjeta y reconstruye el contexto previo. */
+    private boolean recuperar() {
+        if (!activarTarjeta()) return false;
+        if (historial.isEmpty()) return true;
+        log("Reactivo y repongo " + historial.size() + " comando(s) de contexto");
+        for (byte[] h : historial) {
+            if (!activarTarjeta()) return false;
+            enviar(h, 1);
+            try { Thread.sleep(40); } catch (InterruptedException ignored) { }
+        }
+        return true;
+    }
+
     private void bucleRelay() {
         int tg = 0;
         int fallos = 0;
@@ -185,40 +211,32 @@ public class MainActivity extends Activity implements Pn532.Log {
                 Thread.sleep(40);
 
                 byte[] datos = null;
-                for (int intento = 1; intento <= 3; intento++) {
-                    if (tg == 0) {
-                        if (activarTarjeta()) {
-                            tg = 1;
-                            log("Reactivada para reintento " + intento);
-                        } else {
-                            Thread.sleep(250);
-                            continue;
-                        }
+                for (int intento = 1; intento <= 3 && datos == null; intento++) {
+                    if (intento > 1) {
+                        Thread.sleep(150);
+                        if (!recuperar()) { tg = 0; continue; }
+                        tg = 1;
                     }
-                    byte[] params = Pn532Protocol.concat(new byte[] { (byte) tg }, apdu);
-                    byte[] r = pn532.transceive(Pn532Protocol.commandRaw(0x40, params), 1500);
-                    if (r == null || r.length < 3 || (r[1] & 0xff) != 0x41) {
+                    datos = enviar(apdu, tg);
+                    if (datos == null) {
                         tg = 0;
                         log("Reintento " + intento + " sin respuesta en " + Pn532Protocol.hex(apdu));
-                        Thread.sleep(150);
-                        continue;
                     }
-                    int estado = r[2] & 0xff;
-                    if (estado != 0) {
-                        tg = 0;
-                        log("Reintento " + intento + " estado PN532 " + estado);
-                        Thread.sleep(150);
-                        continue;
-                    }
-                    datos = Arrays.copyOfRange(r, 3, r.length);
-                    break;
                 }
 
-                if (datos == null || datos.length == 0) {
+                if (datos == null) {
                     Puente.I.responder(new byte[] { 0x6F, 0x00 });
                     log("Falló definitivo " + Pn532Protocol.hex(apdu));
                     continue;
                 }
+
+                if ((apdu[1] & 0xff) == 0xA4) {
+                    historial.clear();
+                    historial.add(apdu);
+                } else if ((apdu[1] & 0xff) == 0xA8) {
+                    historial.add(apdu);
+                }
+
                 Puente.I.responder(datos);
                 log("APDU " + Pn532Protocol.hex(apdu) + " -> " + Pn532Protocol.hex(datos));
             } catch (Exception e) {
