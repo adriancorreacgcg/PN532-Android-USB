@@ -66,7 +66,7 @@ public class MainActivity extends Activity implements Pn532.Log {
         });
         findViewById(R.id.relayButton).setOnClickListener(v -> iniciarRelay());
         findViewById(R.id.stopButton).setOnClickListener(v -> detenerRelay());
-        findViewById(R.id.firmwareButton).setOnClickListener(v -> firmware());
+        findViewById(R.id.firmwareButton).setOnClickListener(v -> prueba());
         findViewById(R.id.clearButton).setOnClickListener(v -> {
             logBuffer.setLength(0);
             logText.setText("");
@@ -311,15 +311,26 @@ public class MainActivity extends Activity implements Pn532.Log {
         catch (Exception ignored) { }
     }
 
-    private void firmware() {
+    /** Mini sesión de prueba: firmware, select, gpo y el registro que falla. */
+    private void prueba() {
         if (!pn532.abierto()) { showStatus("Conecta el USB primero"); return; }
         new Thread(() -> {
-            byte[] r = pn532.transceive(Pn532Protocol.commandRaw(0x02, new byte[0]), 1500);
-            if (r == null) { log("SIN RESPUESTA al firmware"); return; }
-            log("RX: " + Pn532Protocol.hex(r));
-            if (r.length >= 5 && (r[1] & 0xff) == 0x03) {
-                showStatus("PN532 firmware " + (r[3] & 0xff) + "." + (r[4] & 0xff));
-            }
+            log("== prueba ==");
+            byte[] f = pn532.transceive(Pn532Protocol.commandRaw(0x02, new byte[0]), 1500);
+            log("firmware: " + (f == null ? "sin respuesta" : Pn532Protocol.hex(f)));
+            if (!activarTarjeta()) { log("sin tarjeta en el lector"); return; }
+            log("tarjeta activada");
+            byte[] sel = new byte[] { 0x00, (byte) 0xA4, 0x04, 0x00, 0x07,
+                    (byte) 0xA0, 0x00, 0x00, 0x00, 0x04, 0x10, 0x10, 0x00 };
+            log("select: " + (enviar(sel, 1) == null ? "falló (" + ultimoEstado + ")" : "ok"));
+            byte[] gpo = new byte[] { (byte) 0x80, (byte) 0xA8, 0x00, 0x00, 0x02, (byte) 0x83, 0x00, 0x00 };
+            log("gpo: " + (enviar(gpo, 1) == null ? "falló (" + ultimoEstado + ")" : "ok"));
+            byte[] r6 = new byte[] { 0x00, (byte) 0xB2, 0x01, 0x34, 0x00 };
+            byte[] d6 = leerRegistro(r6, 1);
+            log("registro SFI6 r1: " + (d6 == null ? "falló (" + ultimoEstado + ")" : Pn532Protocol.hex(d6)));
+            byte[] r3 = new byte[] { 0x00, (byte) 0xB2, 0x01, 0x1C, 0x00 };
+            byte[] d3 = leerRegistro(r3, 1);
+            log("registro SFI3 r1 (control): " + (d3 == null ? "falló (" + ultimoEstado + ")" : "ok " + d3.length + " bytes"));
         }).start();
     }
 
