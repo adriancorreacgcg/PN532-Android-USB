@@ -3,7 +3,6 @@ package com.pn532.usbreader;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
-/** Une la tarjeta leída con el servicio HCE. */
 public final class Puente {
 
     public static final Puente I = new Puente();
@@ -12,14 +11,24 @@ public final class Puente {
     private final Object lock = new Object();
     private byte[] respuesta;
     private volatile boolean activo;
+    private volatile boolean estatico;
 
     private Puente() { }
 
     public boolean activo() { return activo; }
+    public boolean estatico() { return estatico; }
 
     public void activar() {
         cola.clear();
         synchronized (lock) { respuesta = null; }
+        estatico = false;
+        activo = true;
+    }
+
+    public void activarEstatico() {
+        cola.clear();
+        synchronized (lock) { respuesta = null; }
+        estatico = true;
         activo = true;
     }
 
@@ -32,7 +41,6 @@ public final class Puente {
         }
     }
 
-    /** Llamado desde HCE: entrega el APDU y espera la respuesta de la tarjeta. */
     public byte[] intercambiar(byte[] apdu, int timeoutMs) {
         if (!activo) return null;
         synchronized (lock) { respuesta = null; }
