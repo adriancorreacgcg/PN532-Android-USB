@@ -163,11 +163,17 @@ public class MainActivity extends Activity implements Pn532.Log {
         return p.length > 2 && (p[1] & 0xff) == 0x4b && (p[2] & 0xff) >= 1;
     }
 
-    private byte[] enviar(byte[] apdu, int tg) {
+    private byte[] enviarCon(byte[] apdu, int tg, int ms) {
         ultimoEstado = -1;
         byte[] params = Pn532Protocol.concat(new byte[] { (byte) tg }, apdu);
-        byte[] r = pn532.transceive(Pn532Protocol.commandRaw(0x40, params), 1500);
-        if (r == null) { ultimoEstado = -2; return null; }
+        long t0 = System.currentTimeMillis();
+        byte[] r = pn532.transceive(Pn532Protocol.commandRaw(0x40, params), ms);
+        long transcurrido = System.currentTimeMillis() - t0;
+        if (r == null) {
+            ultimoEstado = -2;
+            log("  esperé " + transcurrido + " ms y nada");
+            return null;
+        }
         if (r.length < 3 || (r[1] & 0xff) != 0x41) { ultimoEstado = -3; return null; }
         ultimoEstado = r[2] & 0xff;
         if (ultimoEstado != 0) return null;
@@ -175,11 +181,15 @@ public class MainActivity extends Activity implements Pn532.Log {
         return datos.length == 0 ? null : datos;
     }
 
+    private byte[] enviar(byte[] apdu, int tg) {
+        return enviarCon(apdu, tg, 1500);
+    }
+
     private byte[] leerRegistroCon(byte[] apdu, int tg, int le, String etiqueta) {
         byte[] mod = apdu.clone();
         mod[4] = (byte) le;
         ByteArrayOutputStream acum = new ByteArrayOutputStream();
-        byte[] r = enviar(mod, tg);
+        byte[] r = enviarCon(mod, tg, 6000);
         if (r == null) {
             log("  trozo " + etiqueta + " sin respuesta (estado " + ultimoEstado + ")");
             return null;
@@ -200,13 +210,13 @@ public class MainActivity extends Activity implements Pn532.Log {
             if (sw1 == 0x61) {
                 acum.write(r, 0, r.length - 2);
                 byte[] gr = new byte[] { 0x00, (byte) 0xC0, 0x00, 0x00, (byte) sw2 };
-                r = enviar(gr, tg);
+                r = enviarCon(gr, tg, 3000);
                 if (r == null) { log("  get response sin respuesta"); return null; }
                 continue;
             }
             if (sw1 == 0x6C) {
                 mod[4] = (byte) sw2;
-                r = enviar(mod, tg);
+                r = enviarCon(mod, tg, 3000);
                 if (r == null) return null;
                 continue;
             }
@@ -219,7 +229,6 @@ public class MainActivity extends Activity implements Pn532.Log {
         if (apdu.length < 5) return null;
         byte[] r = leerRegistroCon(apdu, tg, 0x40, "64");
         if (r == null) r = leerRegistroCon(apdu, tg, 0x20, "32");
-        if (r == null) r = leerRegistroCon(apdu, tg, 0x10, "16");
         return r;
     }
 
