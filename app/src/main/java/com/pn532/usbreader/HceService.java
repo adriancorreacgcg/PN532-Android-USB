@@ -10,7 +10,8 @@ public class HceService extends HostApduService {
 
     @Override public byte[] processCommandApdu(byte[] apdu, Bundle extras) {
         if (!Puente.I.activo()) return NO_ACTIVO;
-        byte[] r = Puente.I.intercambiar(apdu, 1500);
+        if (Puente.I.estatico()) return Perfil.responder(apdu);
+        byte[] r = Puente.I.intercambiar(apdu, 2500);
         return r == null ? SIN_TARJETA : r;
     }
 
