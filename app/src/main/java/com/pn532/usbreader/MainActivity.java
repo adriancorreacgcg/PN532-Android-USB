@@ -68,7 +68,7 @@ public class MainActivity extends Activity implements Pn532.Log {
         });
         findViewById(R.id.relayButton).setOnClickListener(v -> iniciarRelay());
         findViewById(R.id.stopButton).setOnClickListener(v -> detenerRelay());
-        findViewById(R.id.firmwareButton).setOnClickListener(v -> prueba());
+        findViewById(R.id.firmwareButton).setOnClickListener(v -> capturar());
         findViewById(R.id.clearButton).setOnClickListener(v -> {
             logBuffer.setLength(0);
             logText.setText("");
@@ -200,7 +200,6 @@ public class MainActivity extends Activity implements Pn532.Log {
             if (r.length < 2) return null;
             int sw1 = r[r.length - 2] & 0xff;
             int sw2 = r[r.length - 1] & 0xff;
-            log("  trozo " + etiqueta + " len=" + r.length + " sw=" + Integer.toHexString((sw1 << 8) | sw2));
             if (sw1 == 0x90 && sw2 == 0x00) {
                 acum.write(r, 0, r.length - 2);
                 byte[] cuerpo = acum.toByteArray();
@@ -213,7 +212,7 @@ public class MainActivity extends Activity implements Pn532.Log {
                 acum.write(r, 0, r.length - 2);
                 byte[] gr = new byte[] { 0x00, (byte) 0xC0, 0x00, 0x00, (byte) sw2 };
                 r = enviarCon(gr, tg, 3000);
-                if (r == null) { log("  get response sin respuesta"); return null; }
+                if (r == null) return null;
                 continue;
             }
             if (sw1 == 0x6C) {
@@ -231,7 +230,6 @@ public class MainActivity extends Activity implements Pn532.Log {
         if (apdu.length < 5) return null;
         byte[] r = leerRegistroCon(apdu, tg, 0x00, "completo");
         if (r == null) r = leerRegistroCon(apdu, tg, 0x40, "64");
-        if (r == null) r = leerRegistroCon(apdu, tg, 0x20, "32");
         return r;
     }
 
@@ -325,24 +323,93 @@ public class MainActivity extends Activity implements Pn532.Log {
         catch (Exception ignored) { }
     }
 
-    private void prueba() {
+    private void imprimirTag(String nombre, int tag, byte[] datos) {
+        for (int i = 0; i + 1 < datos.length; i++) {
+            if ((datos[i] & 0xff) == tag) {
+                int len = datos[i + 1] & 0xff;
+                if (i + 2 + len <= datos.length) {
+                    log(nombre + ": " + Pn532Protocol.hex(Arrays.copyOfRange(datos, i + 2, i + 2 + len)));
+                    return;
+                }
+            }
+        }
+    }
+
+    private void capturar() {
         if (!pn532.abierto()) { showStatus("Conecta el USB primero"); return; }
         new Thread(() -> {
-            log("== prueba ==");
-            byte[] f = pn532.transceive(Pn532Protocol.commandRaw(0x02, new byte[0]), 1500);
-            log("firmware: " + (f == null ? "sin respuesta" : Pn532Protocol.hex(f)));
+            log("== captura ==");
             log("init: " + (pn532.transceive(Pn532Protocol.commandRaw(0x14, new byte[] { 1, 0x14, 1 }), 800) == null ? "sin respuesta" : "ok"));
             if (!activarTarjeta()) { log("sin tarjeta en el lector"); return; }
-            log("tarjeta activada");
+
+            ByteArrayOutputStream todo = new ByteArrayOutputStream();
+            byte[] ppse = new byte[] { 0x00, (byte) 0xA4, 0x04, 0x00, 0x0E,
+                    0x32, 0x50, 0x41, 0x59, 0x2E, 0x53, 0x59, 0x53, 0x2E,
+                    0x44, 0x44, 0x46, 0x30, 0x31, 0x00 };
+            byte[] r = enviar(ppse, 1);
+            if (r == null) { log("PPSE falló (" + ultimoEstado + ")"); return; }
+            todo.write(r, 0, r.length);
+            imprimirTag("AID", 0x4F, r);
+
             byte[] sel = new byte[] { 0x00, (byte) 0xA4, 0x04, 0x00, 0x07,
                     (byte) 0xA0, 0x00, 0x00, 0x00, 0x04, 0x10, 0x10, 0x00 };
-            log("select: " + (enviar(sel, 1) == null ? "falló (" + ultimoEstado + ")" : "ok"));
+            r = enviar(sel, 1);
+            if (r == null) { log("SELECT falló (" + ultimoEstado + ")"); return; }
+            todo.write(r, 0, r.length);
+            imprimirTag("nombre app", 0x50, r);
+            log("tiene 9F38 (CDOL1): " + contiene(r, new byte[] { (byte) 0x9F, 0x38 }));
+
             byte[] gpo = new byte[] { (byte) 0x80, (byte) 0xA8, 0x00, 0x00, 0x02, (byte) 0x83, 0x00, 0x00 };
-            log("gpo: " + (enviar(gpo, 1) == null ? "falló (" + ultimoEstado + ")" : "ok"));
-            byte[] r2 = new byte[] { 0x00, (byte) 0xB2, 0x02, 0x14, 0x00 };
-            byte[] d2 = leerRegistro(r2, 1);
-            log("registro SFI2 r2: " + (d2 == null ? "falló (" + ultimoEstado + ")" : corto(d2)));
+            r = enviar(gpo, 1);
+            if (r == null) { log("GPO falló (" + ultimoEstado + ")"); return; }
+            todo.write(r, 0, r.length);
+            imprimirTag("AIP", 0x82, r);
+
+            byte[] afl = buscarTag(r, 0x94);
+            if (afl != null) {
+                log("AFL: " + Pn532Protocol.hex(afl));
+                for (int i = 0; i + 3 < afl.length; i += 4) {
+                    int sfi = (afl[i] & 0xff) >> 3;
+                    int desde = afl[i + 1] & 0xff;
+                    int hasta = afl[i + 2] & 0xff;
+                    for (int rec = desde; rec <= hasta; rec++) {
+                        byte[] apdu = new byte[] { 0x00, (byte) 0xB2, (byte) rec, (byte) ((sfi << 3) | 4), 0x00 };
+                        byte[] rr = leerRegistro(apdu, 1);
+                        if (rr == null) { log("  SFI " + sfi + " rec " + rec + " falló (" + ultimoEstado + ")"); continue; }
+                        todo.write(rr, 0, rr.length);
+                        log("  SFI " + sfi + " rec " + rec + " ok " + rr.length + " bytes");
+                    }
+                }
+            }
+
+            byte[] todos = todo.toByteArray();
+            imprimirTag("PAN 5A", 0x5A, todos);
+            imprimirTag("fecha 5F24", 0x5F24 & 0xff, todos);
+            imprimirTag("pista2 57", 0x57, todos);
+            imprimirTag("9F6E", 0x6E, todos);
+            log("== fin captura ==");
         }).start();
+    }
+
+    private boolean contiene(byte[] datos, byte[] busca) {
+        for (int i = 0; i + busca.length <= datos.length; i++) {
+            boolean ok = true;
+            for (int j = 0; j < busca.length; j++) {
+                if (datos[i + j] != busca[j]) { ok = false; break; }
+            }
+            if (ok) return true;
+        }
+        return false;
+    }
+
+    private byte[] buscarTag(byte[] datos, int tag) {
+        for (int i = 0; i + 1 < datos.length; i++) {
+            if ((datos[i] & 0xff) == tag) {
+                int len = datos[i + 1] & 0xff;
+                if (i + 2 + len <= datos.length) return Arrays.copyOfRange(datos, i + 2, i + 2 + len);
+            }
+        }
+        return null;
     }
 
     private String corto(byte[] d) {
