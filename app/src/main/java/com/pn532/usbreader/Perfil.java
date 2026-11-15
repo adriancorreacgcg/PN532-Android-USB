@@ -50,9 +50,17 @@ public final class Perfil {
         (byte) 0x90, 0x00
     };
 
-    /** Formato 1 con la pista 2 cruda, sin AFL ni criptograma. */
+    /** Formato 1 con AIP 19 80, como la donante. */
     private static final byte[] GPO_MSD = new byte[] {
         (byte) 0x80, 0x10, 0x19, (byte) 0x80,
+        0x55, 0x79, 0x07, 0x01, 0x61, 0x48, 0x35, 0x35, (byte) 0xD3,
+        0x00, 0x32, 0x01, (byte) 0x94, 0x2F,
+        (byte) 0x90, 0x00
+    };
+
+    /** Formato 1 con AIP 00 00: apaga CDA y fuerza banda. */
+    private static final byte[] GPO_DOWNGRADE = new byte[] {
+        (byte) 0x80, 0x10, 0x00, 0x00,
         0x55, 0x79, 0x07, 0x01, 0x61, 0x48, 0x35, 0x35, (byte) 0xD3,
         0x00, 0x32, 0x01, (byte) 0x94, 0x2F,
         (byte) 0x90, 0x00
@@ -95,7 +103,9 @@ public final class Perfil {
 
     public static int varianteActual() { return variante; }
 
-    public static byte[] gpoBanda() { return GPO_MSD; }
+    public static byte[] gpoBanda() { return GPO_DOWNGRADE; }
+
+    public static byte[] registro() { return REGISTRO; }
 
     public static byte[] responder(byte[] apdu) {
         if (apdu.length < 4) return NO_SOPORTADO;
