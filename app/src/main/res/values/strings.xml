@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">PN532 Relay</string>
+    <string name="servicio">Relay PN532</string>
+    <string name="grupo">Pagos</string>
+</resources>
