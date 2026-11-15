@@ -13,6 +13,7 @@ public class HceService extends HostApduService {
         if (Puente.I.estatico()) {
             byte[] guardado = Aprendiz.buscar(apdu);
             byte[] r = guardado != null ? guardado : Perfil.responder(apdu);
+            r = Datos.aplicar(r);
             Puente.I.anotar("> " + Pn532Protocol.hex(apdu));
             Puente.I.anotar("< " + Pn532Protocol.hex(r) + (guardado != null ? "  (guardado)" : "  (perfil)"));
             return r;
