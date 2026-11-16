@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 import java.util.Arrays;
+import java.util.Map;
 
 /** Guarda y repite el diálogo real de la tarjeta. */
 public final class Aprendiz {
@@ -23,6 +24,15 @@ public final class Aprendiz {
 
     public static int cuantas() {
         return prefs == null ? 0 : prefs.getAll().size();
+    }
+
+    public static String volcar() {
+        if (prefs == null) return "";
+        StringBuilder s = new StringBuilder();
+        for (Map.Entry<String, ?> e : prefs.getAll().entrySet()) {
+            s.append(e.getKey()).append(" = ").append(e.getValue()).append('\n');
+        }
+        return s.toString();
     }
 
     public static void guardar(byte[] apdu, byte[] resp) {
