@@ -81,6 +81,7 @@ public class MainActivity extends Activity implements Pn532.Log {
             else conectar();
         });
         findViewById(R.id.aprenderButton).setOnClickListener(v -> iniciarAprender());
+        findViewById(R.id.subirAtcButton).setOnClickListener(v -> subirAtc(1000));
         findViewById(R.id.relayButton).setOnClickListener(v -> iniciarRelay());
         findViewById(R.id.estaticoButton).setOnClickListener(v -> iniciarEstatico(1));
         findViewById(R.id.estatico2Button).setOnClickListener(v -> iniciarEstatico(2));
@@ -139,6 +140,48 @@ public class MainActivity extends Activity implements Pn532.Log {
             log("Error al conectar: " + e.getMessage());
             showStatus("Error de conexión");
         }
+    }
+
+    private void subirAtc(int veces) {
+        if (!pn532.abierto()) { showStatus("Conecta el USB primero"); return; }
+        if (relay) return;
+        byte[] cmd = Aprendiz.comandoAE();
+        if (cmd == null) { showStatus("Aprende primero"); return; }
+        relay = true;
+        showStatus("Subiendo ATC");
+        new Thread(() -> {
+            int ok = 0;
+            try {
+                limpiarChip();
+                if (!activarTarjeta()) { log("sin tarjeta en el lector"); return; }
+                for (int i = 0; i < veces && relay; i++) {
+                    byte[] r = enviarCon(cmd, 1, 3000);
+                    if (r == null) {
+                        if (!recuperar()) { log("tarjeta perdida en " + i); break; }
+                        continue;
+                    }
+                    ok++;
+                    if (ok % 100 == 0) {
+                        log("ATC ahora " + atcDe(r) + " · " + ok + " incrementos");
+                        showStatus("ATC " + atcDe(r));
+                    }
+                }
+                log("Listo: " + ok + " incrementos");
+            } catch (Exception e) {
+                log("Error: " + e.getMessage());
+            } finally {
+                relay = false;
+            }
+        }).start();
+    }
+
+    private String atcDe(byte[] r) {
+        for (int i = 0; i + 3 < r.length; i++) {
+            if ((r[i] & 0xff) == 0x9F && (r[i + 1] & 0xff) == 0x36 && (r[i + 2] & 0xff) == 0x02) {
+                return String.format("%02X%02X", r[i + 3] & 0xff, r[i + 4] & 0xff);
+            }
+        }
+        return "?";
     }
 
     private void iniciarRelay() {
