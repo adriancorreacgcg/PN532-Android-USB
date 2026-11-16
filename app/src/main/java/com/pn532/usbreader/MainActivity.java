@@ -85,8 +85,14 @@ public class MainActivity extends Activity implements Pn532.Log {
         findViewById(R.id.estaticoButton).setOnClickListener(v -> iniciarEstatico(1));
         findViewById(R.id.estatico2Button).setOnClickListener(v -> iniciarEstatico(2));
         findViewById(R.id.estatico3Button).setOnClickListener(v -> iniciarEstatico(3));
+        findViewById(R.id.estatico4Button).setOnClickListener(v -> iniciarEstatico(4));
+        findViewById(R.id.estatico5Button).setOnClickListener(v -> iniciarEstatico(5));
         findViewById(R.id.stopButton).setOnClickListener(v -> detenerRelay());
         findViewById(R.id.firmwareButton).setOnClickListener(v -> capturar());
+        findViewById(R.id.volcarButton).setOnClickListener(v -> {
+            String t = Aprendiz.volcar();
+            log(t.isEmpty() ? "nada guardado" : t);
+        });
         findViewById(R.id.clearButton).setOnClickListener(v -> {
             logBuffer.setLength(0);
             logText.setText("");
@@ -175,9 +181,8 @@ public class MainActivity extends Activity implements Pn532.Log {
         Perfil.variante(variante);
         Puente.I.activarEstatico();
         preferir(true);
-        showStatus(variante == 3 ? "Banda forzada activa"
-                : variante == 2 ? "Estático 2 activo" : "Estático activo");
-        log("== estático " + variante + " ==");
+        showStatus("Modo " + variante + " activo");
+        log("== modo " + variante + " ==");
         log("PAN " + Datos.soloDigitos(Datos.pan) + " venc " + Datos.soloDigitos(Datos.venc)
                 + " serv " + Datos.soloDigitos(Datos.servicio));
         log("Guardadas: " + Aprendiz.cuantas() + " respuestas.");
@@ -433,7 +438,7 @@ public class MainActivity extends Activity implements Pn532.Log {
             if (r == null) { log("SELECT falló (" + ultimoEstado + ")"); return; }
             todo.write(r, 0, r.length);
             imprimirTag("nombre app", 0x50, r);
-            log("tiene 9F38 (CDOL1): " + contiene(r, new byte[] { (byte) 0x9F, 0x38 }));
+            log("tiene 9F38 (PDOL): " + contiene(r, new byte[] { (byte) 0x9F, 0x38 }));
 
             byte[] gpo = new byte[] { (byte) 0x80, (byte) 0xA8, 0x00, 0x00, 0x02, (byte) 0x83, 0x00, 0x00 };
             r = enviar(gpo, 1);
@@ -461,6 +466,7 @@ public class MainActivity extends Activity implements Pn532.Log {
             byte[] todos = todo.toByteArray();
             imprimirTag("PAN 5A", 0x5A, todos);
             imprimirTag("pista2 57", 0x57, todos);
+            imprimirTag("CDOL1 8C", 0x8C, todos);
             log("== fin captura ==");
         }).start();
     }
