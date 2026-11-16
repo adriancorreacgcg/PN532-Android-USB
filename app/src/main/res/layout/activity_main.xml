@@ -66,19 +66,31 @@
             android:id="@+id/estaticoButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Modo estático" />
+            android:text="Modo 1 estático" />
 
         <Button
             android:id="@+id/estatico2Button"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Modo estático 2 (banda)" />
+            android:text="Modo 2 banda AIP 19 80" />
 
         <Button
             android:id="@+id/estatico3Button"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Modo estático 3 (banda forzada)" />
+            android:text="Modo 3 banda AIP 18 00" />
+
+        <Button
+            android:id="@+id/estatico4Button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Modo 4 TC offline + ATC" />
+
+        <Button
+            android:id="@+id/estatico5Button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Modo 5 ARQC + ATC" />
 
         <Button
             android:id="@+id/stopButton"
@@ -91,6 +103,12 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Capturar tarjeta" />
+
+        <Button
+            android:id="@+id/volcarButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Ver guardado" />
 
         <Button
             android:id="@+id/clearButton"
