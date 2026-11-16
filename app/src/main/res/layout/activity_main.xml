@@ -57,6 +57,12 @@
             android:text="Aprender tarjeta (USB)" />
 
         <Button
+            android:id="@+id/subirAtcButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Subir ATC 1000 (USB)" />
+
+        <Button
             android:id="@+id/relayButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
