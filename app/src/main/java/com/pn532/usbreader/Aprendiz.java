@@ -35,12 +35,19 @@ public final class Aprendiz {
         return s.toString();
     }
 
+    public static byte[] comandoAE() {
+        if (prefs == null) return null;
+        String v = prefs.getString("cmdAE", null);
+        return v == null ? null : dehex(v);
+    }
+
     public static void guardar(byte[] apdu, byte[] resp) {
         if (prefs == null) return;
         SharedPreferences.Editor e = prefs.edit();
         e.putString(clave(apdu), hex(resp));
         int ins = apdu.length > 1 ? (apdu[1] & 0xff) : 0;
         if (ins == 0xA8 || ins == 0xAE) e.putString(alias(ins), hex(resp));
+        if (ins == 0xAE) e.putString("cmdAE", hex(apdu));
         e.apply();
     }
 
