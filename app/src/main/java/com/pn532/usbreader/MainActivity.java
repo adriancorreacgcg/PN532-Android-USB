@@ -536,9 +536,7 @@ public class MainActivity extends Activity implements Pn532.Log {
     }
 
     private String corto(byte[] d) {
-        int n = Math.min(d.length, 24);
-        String s = Pn532Protocol.hex(Arrays.copyOfRange(d, 0, n));
-        return d.length > n ? s + " …(" + d.length + " bytes)" : s;
+        return Pn532Protocol.hex(d);
     }
 
     private void showStatus(String texto) {
